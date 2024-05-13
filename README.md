@@ -1,3 +1,9 @@
+# 加筆修正分
+* ビルドには JAVA17 以降である必要あり。もちろんJMeterもJAVA17以降で実行するある必要あり。
+
+---
+↓オリジナルのやつ
+
 # AWS Meter
 
 ![Screenshot](https://raw.githubusercontent.com/JoseLuisSR/awsmeter/main/doc/img/awsmeter-kinesis-context-view.png)

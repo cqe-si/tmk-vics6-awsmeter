@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.jmeter.config.Argument;
 import org.apache.jmeter.protocol.java.sampler.JavaSamplerClient;
+import org.apache.jmeter.samplers.AbstractSampler;
 import org.apache.jmeter.samplers.SampleResult;
 
 import java.util.List;
@@ -14,13 +15,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * AWS Sampler class that implements JavaSamplerClient class to create custom Java Request Sampler per AWS Service.
+ * AWS Sampler class that implements JavaSamplerClient class to create custom
+ * Java Request Sampler per AWS Service.
+ * 
  * @author JoseLuisSR
  * @since 01/27/2021
  * @see "https://github.com/JoseLuisSR/awsmeter"
  */
-public abstract class AWSSampler implements JavaSamplerClient{
-
+public abstract class AWSSampler implements JavaSamplerClient {
 
     /**
      * IAM user with programmatic access, access key id.
@@ -38,12 +40,14 @@ public abstract class AWSSampler implements JavaSamplerClient{
     protected static final String AWS_SESSION_TOKEN = "aws_session_token";
 
     /**
-     * AWS region, https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+     * AWS region,
+     * https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
      */
     protected static final String AWS_REGION = "aws_region";
 
     /**
-     * AWS CLI profile. A named profile is a collection of settings and credentials store in your machine.
+     * AWS CLI profile. A named profile is a collection of settings and credentials
+     * store in your machine.
      */
     protected static final String AWS_CONFIG_PROFILE = "aws_configure_profile";
 
@@ -110,10 +114,12 @@ public abstract class AWSSampler implements JavaSamplerClient{
 
     /**
      * Create new SampleResult.
+     * 
      * @return SampleResult, captures data such as whether the test was successful,
-     * the response code and message, any request or response data and the test start/end times
+     *         the response code and message, any request or response data and the
+     *         test start/end times
      */
-    protected SampleResult newSampleResult(){
+    protected SampleResult newSampleResult() {
         SampleResult result = new SampleResult();
         result.setDataEncoding(ENCODING);
         result.setDataType(SampleResult.TEXT);
@@ -121,13 +127,15 @@ public abstract class AWSSampler implements JavaSamplerClient{
     }
 
     /**
-     * Start the sample request and set the <code>samplerData</code> to the requestData.
+     * Start the sample request and set the <code>samplerData</code> to the
+     * requestData.
+     * 
      * @param result
-     *        SampleResult mutable object to update status.
+     *               SampleResult mutable object to update status.
      * @param data
-     *        The request to set as <code>samplerData</code>.
+     *               The request to set as <code>samplerData</code>.
      */
-    protected void sampleResultStart(SampleResult result, String data){
+    protected void sampleResultStart(SampleResult result, String data) {
         result.setSamplerData(data);
         result.sampleStart();
     }
@@ -140,11 +148,11 @@ public abstract class AWSSampler implements JavaSamplerClient{
      * marked as not requiring a response.
      *
      * @param result
-     *        SampleResult mutable object to change.
+     *                 SampleResult mutable object to change.
      * @param response
-     *        The successful result message, may be null.
+     *                 The successful result message, may be null.
      */
-    protected void sampleResultSuccess(SampleResult result, String response){
+    protected void sampleResultSuccess(SampleResult result, String response) {
         result.sampleEnd();
         result.setSuccessful(true);
         result.setResponseCodeOK();
@@ -157,11 +165,11 @@ public abstract class AWSSampler implements JavaSamplerClient{
      * reason.
      *
      * @param result
-     *        SampleResult mutable object to change.
+     *                 SampleResult mutable object to change.
      * @param code
-     *        The failure code.
+     *                 The failure code.
      * @param response
-     *        The failure reason.
+     *                 The failure reason.
      */
     protected void sampleResultFail(SampleResult result, String code, String response) {
         result.sampleEnd();
@@ -172,18 +180,20 @@ public abstract class AWSSampler implements JavaSamplerClient{
 
     /**
      * Read message attributes and deserialize from JSON to Objects.
+     * 
      * @param msgAttributes
-     *        Messages attributes in JSON format.
+     *                      Messages attributes in JSON format.
      * @return Message attributes list.
      * @throws JsonProcessingException
-     *         Exception when deserialize JSON to Object.
+     *                                 Exception when deserialize JSON to Object.
      */
     protected List<MessageAttribute> readMsgAttributes(final String msgAttributes) throws JsonProcessingException {
         ObjectMapper objectMapper = new ObjectMapper();
         return objectMapper.readValue(Optional.ofNullable(msgAttributes)
-                        .filter(Predicate.not(String::isEmpty))
-                        .orElseGet(() -> EMPTY_ARRAY),
-                new TypeReference<List<MessageAttribute>>() {}).stream()
+                .filter(Predicate.not(String::isEmpty))
+                .orElseGet(() -> EMPTY_ARRAY),
+                new TypeReference<List<MessageAttribute>>() {
+                }).stream()
                 .limit(MSG_ATTRIBUTES_MAX)
                 .collect(Collectors.toList());
     }

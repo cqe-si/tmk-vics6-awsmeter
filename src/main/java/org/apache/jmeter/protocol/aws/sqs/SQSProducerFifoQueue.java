@@ -16,11 +16,12 @@ import java.util.stream.Stream;
 
 /**
  * SQS Producer Sampler class to connect and publish messages on SQS FIFO queue.
+ * 
  * @author JoseLuisSR
  * @since 01/27/2021
  * @see "https://github.com/JoseLuisSR/awsmeter"
  */
-public class SQSProducerFifoQueue extends SQSProducerSampler{
+public class SQSProducerFifoQueue extends SQSProducerSampler {
 
     /**
      * List of Arguments to SQS FIFO Queue.
@@ -34,8 +35,10 @@ public class SQSProducerFifoQueue extends SQSProducerSampler{
             .collect(Collectors.toList());
 
     /**
-     * Initial values for test parameter. They are show in Java Request test sampler.
+     * Initial values for test parameter. They are show in Java Request test
+     * sampler.
      * AWS parameters and SQS parameters.
+     * 
      * @return Arguments to set as default on Java Request.
      */
     @Override
@@ -48,32 +51,35 @@ public class SQSProducerFifoQueue extends SQSProducerSampler{
     }
 
     /**
-     * Main method to execute the test on single thread. Create Message and publish it on SQS FIFO Queue.
+     * Main method to execute the test on single thread. Create Message and publish
+     * it on SQS FIFO Queue.
+     * 
      * @param context
-     *        Arguments values on Java Sampler.
+     *                Arguments values on Java Sampler.
      * @return SampleResult, captures data such as whether the test was successful,
-     * the response code and message, any request or response data, and the test start/end times
+     *         the response code and message, any request or response data, and the
+     *         test start/end times
      */
     @Override
     public SampleResult runTest(JavaSamplerContext context) {
 
         SampleResult result = newSampleResult();
         sampleResultStart(result, String.format("Queue Name: %s \nMsg Body : %s \nMsg Attribute: %s " +
-                        "\nMsg Group Id: %s \nMsg Deduplication Id: %s",
+                "\nMsg Group Id: %s \nMsg Deduplication Id: %s",
                 context.getParameter(SQS_QUEUE_NAME),
                 context.getParameter(SQS_MSG_BODY),
                 context.getParameter(SQS_MSG_ATTRIBUTES),
                 context.getParameter(SQS_MSG_GROUP_ID),
                 context.getParameter(SQS_MSG_DEDUPLICATION_ID)));
 
-        try{
+        try {
             log.info("Put Message on Queue");
             SendMessageResponse msgRsp = sqsClient.sendMessage(createSendMessageRequest(context));
 
             sampleResultSuccess(result, String.format("Message id: %s \nSequence Number: %s",
                     msgRsp.messageId(),
                     msgRsp.sequenceNumber()));
-        }catch (SqsException exc){
+        } catch (SqsException exc) {
             sampleResultFail(result, exc.awsErrorDetails().errorCode(), exc.awsErrorDetails().errorMessage());
         } catch (JsonProcessingException exc) {
             sampleResultFail(result, FAIL_CODE, exc.getMessage());
@@ -84,11 +90,13 @@ public class SQSProducerFifoQueue extends SQSProducerSampler{
 
     /**
      * Create request to publish message on SQS FIFO Queue.
+     * 
      * @param context
-     *        Arguments values on Java Sampler.
-     * @return SendMessageRequest with message elements like body, attributes, deduplication id, group id and more.
+     *                Arguments values on Java Sampler.
+     * @return SendMessageRequest with message elements like body, attributes,
+     *         deduplication id, group id and more.
      * @throws JsonProcessingException
-     *         Exception when deserialize JSON to Object.
+     *                                 Exception when deserialize JSON to Object.
      */
     @Override
     public SendMessageRequest createSendMessageRequest(JavaSamplerContext context) throws JsonProcessingException {
@@ -102,5 +110,15 @@ public class SQSProducerFifoQueue extends SQSProducerSampler{
                 .messageGroupId(context.getParameter(SQS_MSG_GROUP_ID))
                 .messageDeduplicationId(context.getParameter(SQS_MSG_DEDUPLICATION_ID))
                 .build();
+    }
+
+    @Override
+    protected String getSetupTestLogMessage() {
+        return SQSProducerFifoQueue.class.toString();
+    }
+
+    @Override
+    protected String getTeardownTestLogMessage() {
+        return SQSProducerFifoQueue.class.toString();
     }
 }

@@ -98,4 +98,14 @@ public class SQSProducerStandardQueue extends SQSProducerSampler{
                 .delaySeconds(context.getIntParameter(SQS_DELAY_SECONDS))
                 .build();
     }
+
+    @Override
+    protected String getSetupTestLogMessage() {
+        return SQSProducerStandardQueue.class.toString();
+    }
+
+    @Override
+    protected String getTeardownTestLogMessage() {
+        return SQSProducerStandardQueue.class.toString();
+    }
 }
