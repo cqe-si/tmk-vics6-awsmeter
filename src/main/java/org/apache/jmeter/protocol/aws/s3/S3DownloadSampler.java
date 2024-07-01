@@ -8,10 +8,8 @@ import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.samplers.SampleResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.SdkClient;
-import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -22,8 +20,6 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +47,7 @@ public class S3DownloadSampler extends AWSSampler implements AWSClientSDK2 {
             new Argument(S3_BUCKET_NAME, EMPTY, "S3のバケット名"),
             new Argument(S3_OBJECT_KEY, EMPTY, "バケットの中のS3のパス"),
             new Argument(DOWNLOAD_PATH, EMPTY,
-                    "ダウンロード先のパス（ローカルのパス）。空の場合はファイル保存なしモードとして動作するが、DL中にディスクにフラッシュしないのでメモリ消費が多くなる"),
+                    "ダウンロード先のパス（ローカルのパス）。空の場合はファイル保存なしモードとして動作する"),
             new Argument(BUFFER_SIZE, "1048576", "ダウンロード時にファイル保存する場合のバッファサイズ（バイト）"))
             .collect(Collectors.toList());
 
@@ -109,32 +105,12 @@ public class S3DownloadSampler extends AWSSampler implements AWSClientSDK2 {
             long startTime = System.currentTimeMillis();
 
             if (context.getParameter(DOWNLOAD_PATH).isEmpty()) {
-                ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObject(getObjectRequest,
-                        ResponseTransformer.toBytes());
-                log.info("Received Object. File size: {} bytes", objectBytes.asByteArray().length);
+                // ダウンロード先のパスが空の場合はファイル保存なしモードとして動作
+                processS3Object(getObjectRequest, context, null);
             } else {
-                try (ResponseInputStream<GetObjectResponse> s3ObjectStream = s3Client.getObject(getObjectRequest,
-                        ResponseTransformer.toInputStream());
-                        OutputStream outputStream = new FileOutputStream(context.getParameter(DOWNLOAD_PATH))) {
-
-                    long contentLength = s3ObjectStream.response().contentLength();
-                    int bufferSize = Integer.parseInt(context.getParameter(BUFFER_SIZE));
-                    byte[] buffer = new byte[bufferSize];
-                    int bytesRead;
-                    long totalBytesRead = 0;
-                    int lastLoggedProgress = 0;
-                    while ((bytesRead = s3ObjectStream.read(buffer)) != -1) {
-                        outputStream.write(buffer, 0, bytesRead);
-                        totalBytesRead += bytesRead;
-                        int progress = (int) ((double) totalBytesRead / contentLength * 100);
-                        if (log.isInfoEnabled() && progress / 10 > lastLoggedProgress) {
-                            lastLoggedProgress = progress / 10;
-                            log.info("Receiving Object: {}% ({} / {} bytes)", String.format("%.1f", (double) progress),
-                                    totalBytesRead, contentLength);
-                        }
-                    }
-                    outputStream.flush();
-                }
+                // ダウンロード先のパスが指定されている場合はファイル保存モードとして動作
+                OutputStream outputStream = new FileOutputStream(context.getParameter(DOWNLOAD_PATH));
+                processS3Object(getObjectRequest, context, outputStream);
             }
 
             long endTime = System.currentTimeMillis();
@@ -147,6 +123,42 @@ public class S3DownloadSampler extends AWSSampler implements AWSClientSDK2 {
         }
 
         return result;
+    }
+
+    private void processS3Object(GetObjectRequest getObjectRequest, JavaSamplerContext context,
+            OutputStream outputStream) {
+        try (ResponseInputStream<GetObjectResponse> s3ObjectStream = s3Client.getObject(getObjectRequest,
+                ResponseTransformer.toInputStream())) {
+            long contentLength = s3ObjectStream.response().contentLength();
+            int bufferSize = Integer.parseInt(context.getParameter(BUFFER_SIZE));
+            byte[] buffer = new byte[bufferSize];
+            int bytesRead;
+            long totalBytesRead = 0;
+            int lastLoggedProgress = 0;
+
+            while ((bytesRead = s3ObjectStream.read(buffer)) != -1) {
+                if (outputStream != null) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                totalBytesRead += bytesRead;
+                int progress = (int) ((double) totalBytesRead / contentLength * 100);
+
+                if (log.isInfoEnabled() && progress / 10 > lastLoggedProgress) {
+                    lastLoggedProgress = progress / 10;
+                    log.info("Receiving Object: {}% ({} / {} bytes)", String.format("%.1f", (double) progress),
+                            totalBytesRead, contentLength);
+                }
+
+                // メモリからデータをフラッシュ（揮発）
+                buffer = new byte[bufferSize];
+            }
+
+            if (outputStream != null) {
+                outputStream.flush();
+            }
+        } catch (S3Exception | IOException e) {
+            log.error("Error processing S3 object.", e);
+        }
     }
 
     @Override
