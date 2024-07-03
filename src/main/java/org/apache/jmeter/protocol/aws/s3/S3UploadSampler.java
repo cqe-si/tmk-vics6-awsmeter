@@ -9,11 +9,14 @@ import org.apache.jmeter.samplers.SampleResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.SdkClient;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import java.net.URI;
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
@@ -33,11 +36,13 @@ public class S3UploadSampler extends AWSSampler implements AWSClientSDK2 {
 
     private static final String S3_BUCKET_NAME = "s3_bucket_name";
     private static final String S3_OBJECT_KEY = "s3_object_key";
+    private static final String S3_ENDPOINT = "s3_endpoint";
     private static final String UPLOAD_PATH = "upload_path";
 
     private static final List<Argument> S3_PARAMETERS = Stream.of(
             new Argument(S3_BUCKET_NAME, EMPTY, "S3のバケット名"),
             new Argument(S3_OBJECT_KEY, EMPTY, "バケットの中のS3のパス"),
+            new Argument(S3_ENDPOINT, EMPTY, "S3のVPCエンドポイントURL（オプション）"),
             new Argument(UPLOAD_PATH, EMPTY, "アップロードするファイルのローカルパス"))
             .collect(Collectors.toList());
 
@@ -45,10 +50,16 @@ public class S3UploadSampler extends AWSSampler implements AWSClientSDK2 {
 
     @Override
     public SdkClient createSdkClient(Map<String, String> credentials) {
-        return S3Client.builder()
+        S3ClientBuilder builder = S3Client.builder()
                 .region(Region.of(getAWSRegion(credentials)))
-                .credentialsProvider(getAwsCredentialsProvider(credentials))
-                .build();
+                .credentialsProvider(getAwsCredentialsProvider(credentials));
+
+        String endpoint = credentials.get(S3_ENDPOINT);
+        if (endpoint != null && !endpoint.isEmpty()) {
+            builder.endpointOverride(URI.create(endpoint));
+        }
+
+        return builder.build();
     }
 
     @Override
@@ -92,7 +103,8 @@ public class S3UploadSampler extends AWSSampler implements AWSClientSDK2 {
 
             File file = new File(context.getParameter(UPLOAD_PATH));
             if (!file.exists() || !file.isFile()) {
-                throw new IllegalArgumentException("The file does not exist or is not a file: " + context.getParameter(UPLOAD_PATH));
+                throw new IllegalArgumentException(
+                        "The file does not exist or is not a file: " + context.getParameter(UPLOAD_PATH));
             }
 
             long startTime = System.currentTimeMillis();
@@ -104,7 +116,7 @@ public class S3UploadSampler extends AWSSampler implements AWSClientSDK2 {
             log.info("Upload time: {} ms", elapsedTime);
 
             sampleResultSuccess(result, "Upload successful.");
-        } catch (S3Exception | IllegalArgumentException e) {
+        } catch (S3Exception | SdkClientException | IllegalArgumentException e) {
             sampleResultFail(result, e.getMessage(), e.toString());
         }
 

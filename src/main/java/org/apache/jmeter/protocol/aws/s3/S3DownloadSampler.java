@@ -10,13 +10,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.SdkClient;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import java.net.URI;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -40,12 +43,14 @@ public class S3DownloadSampler extends AWSSampler implements AWSClientSDK2 {
 
     private static final String S3_BUCKET_NAME = "s3_bucket_name";
     private static final String S3_OBJECT_KEY = "s3_object_key";
+    private static final String S3_ENDPOINT = "s3_endpoint";
     private static final String DOWNLOAD_PATH = "download_path";
     private static final String BUFFER_SIZE = "buffer_size";
 
     private static final List<Argument> S3_PARAMETERS = Stream.of(
             new Argument(S3_BUCKET_NAME, EMPTY, "S3のバケット名"),
             new Argument(S3_OBJECT_KEY, EMPTY, "バケットの中のS3のパス"),
+            new Argument(S3_ENDPOINT, EMPTY, "S3のVPCエンドポイントURL（オプション）"),
             new Argument(DOWNLOAD_PATH, EMPTY,
                     "ダウンロード先のパス（ローカルのパス）。空の場合はファイル保存なしモードとして動作する"),
             new Argument(BUFFER_SIZE, "1048576", "ダウンロード時にファイル保存する場合のバッファサイズ（バイト）"))
@@ -55,10 +60,16 @@ public class S3DownloadSampler extends AWSSampler implements AWSClientSDK2 {
 
     @Override
     public SdkClient createSdkClient(Map<String, String> credentials) {
-        return S3Client.builder()
+        S3ClientBuilder builder = S3Client.builder()
                 .region(Region.of(getAWSRegion(credentials)))
-                .credentialsProvider(getAwsCredentialsProvider(credentials))
-                .build();
+                .credentialsProvider(getAwsCredentialsProvider(credentials));
+
+        String endpoint = credentials.get(S3_ENDPOINT);
+        if (endpoint != null && !endpoint.isEmpty()) {
+            builder.endpointOverride(URI.create(endpoint));
+        }
+
+        return builder.build();
     }
 
     @Override
@@ -118,7 +129,7 @@ public class S3DownloadSampler extends AWSSampler implements AWSClientSDK2 {
             log.info("Download time: {} ms", elapsedTime);
 
             sampleResultSuccess(result, "Download successful.");
-        } catch (S3Exception | IOException e) {
+        } catch (S3Exception | SdkClientException | IOException e) {
             sampleResultFail(result, e.getMessage(), e.toString());
         }
 
